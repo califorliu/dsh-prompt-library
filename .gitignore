@@ -1,0 +1,9 @@
+# Test dependencies (react / react-dom / jsdom), reinstalled on demand:
+#   cd test && pnpm install --node-linker=hoisted
+node_modules/
+
+# pnpm content-addressed store produced by the test install
+.pnpm-store/
+
+# Superseded session's backup tree: kept on disk for reference, not tracked.
+.discarded-other-session/

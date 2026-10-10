@@ -1,0 +1,7 @@
+# bundle patch for dsh-prompt-library: inserts its plugin row into the web
+# profile roster. Applied as a profile bundle layer (the `dsh.bundle.patch`
+# manifest field); install with
+#   dsh plugin --profile desktop add link:<repo>/dsh-prompt-library
+- insert:
+    - id: prompt-library
+      name: dsh-prompt-library

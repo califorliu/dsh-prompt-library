@@ -1,0 +1,14 @@
+# Keep LF in the working tree.
+#
+# core.autocrlf is true on this machine (system config), so without this a
+# checkout would rewrite every source file to CRLF. These files are LF today
+# and the plugin is loaded by Node as an ESM module; silent line-ending
+# churn would make the whole tree look modified after any checkout.
+* text=auto eol=lf
+
+# Never normalise binary assets.
+*.png binary
+*.jpg binary
+*.ico binary
+*.woff binary
+*.woff2 binary
