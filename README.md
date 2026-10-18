@@ -67,34 +67,77 @@ DSH Web GUI 的**预设提示词库**：把你沉淀出来的提示词模板（�
 
 ## 安装
 
-```powershell
-$dsh = 'D:\dsh\resources\runtime\cli\bin\dsh.cmd'   # dsh 不在 PATH 时用绝对路径
-& $dsh plugin --profile desktop add link:D:\dsh\workspace\dsh-plugin-prompt-library\dsh-prompt-library
+两种装法：**从 GitHub 装**（普通使用）和**从本地目录 link 装**（开发用）。同一个包名在 profile 里只能有一份，切换前必须先把旧的卸干净（见「卸载与切换安装方式」）。
+
+### 从 GitHub 安装（普通使用）
+
+GUI：侧边栏 **插件** → **添加插件**（或箭头菜单里的「安装第三方插件」），粘贴：
+
+```
+https://github.com/califorliu/dsh-prompt-library
 ```
 
-**这一条就够了。** `dsh plugin` 包装了 pnpm，并在装完后自己把包名注册进 profile（已实测：新 profile 与既有 profile 都会写）。它会做三件事：
+命令行等价写法：
 
-1. 在 `profiles/desktop/package.json` 的 `dependencies` 里写 `link:` 依赖；
-2. 在 `profiles/desktop/node_modules/` 下建 junction；
+```powershell
+$dsh = 'D:\dsh\resources\runtime\cli\bin\dsh.cmd'   # dsh 不在 PATH 时用绝对路径
+& $dsh plugin --profile desktop add github:califorliu/dsh-prompt-library
+```
+
+`dsh plugin` 包装了 pnpm，并在装完后自己把包名注册进 profile（已实测：新 profile 与既有 profile 都会写）。它会做三件事：
+
+1. 在 `profiles/desktop/package.json` 的 `dependencies` 里写 git 依赖（`github:califorliu/dsh-prompt-library`）；
+2. 把包解压进 `profiles/desktop/node_modules/`；
 3. 把 `"dsh-prompt-library"` 追加进 `dsh.profile.bundles`。
 
 第 3 步是必需的，不是装饰：profile 的组合方式是「按 `dsh.profile.bundles` 的顺序，把每个 bundle 的 `cordis.patch.yml` 叠加到一棵空条目树上」。包不在这个数组里，`cordis.patch.yml` 里那条 `insert: [{ id: prompt-library, name: dsh-prompt-library }]` 就永远不会被应用。
 
-> 也可以完全不动命令行：GUI 的 **Settings → Plugins** 页面能装本地包。
+git 安装按 commit 锁定：`pnpm-lock.yaml` 里记的是 `codeload.github.com/califorliu/dsh-prompt-library/tar.gz/<sha>`。仓库更新后要**重装**（卸载 + 再装，或 GUI 里的更新）才会拿到新版本。
 
-卸载：
-
-```powershell
-& $dsh plugin --profile desktop remove dsh-prompt-library
-```
-
-`remove` 会清掉依赖项和 `dsh.profile.bundles` 里的那一项，**但会在 `node_modules/` 下留下一个悬空 junction**（已实测）。要彻底干净，卸载后再删一次：
+### 从本地目录安装（开发用）
 
 ```powershell
-Remove-Item 'C:\Users\micha\.dsh\profiles\desktop\node_modules\dsh-prompt-library' -Force
+& $dsh plugin --profile desktop add link:<你的开发目录>\dsh-prompt-library
 ```
 
-升级：替换 `lib/` 下的文件即可，**无依赖、无构建**。但宿主对**已经加载过**的插件模块没有热重载，改完必须**重启 DSH**（改 mtime、disable→enable 都无效）。
+与 GitHub 安装只有第 1、2 步不同：依赖写成 `link:`，`node_modules/` 下建的是 junction。改 `lib/` 后仍然要重启 DSH 才生效（见「升级」）。
+
+> 完全不动命令行也可以：GUI 的 **插件 → 添加插件** 同样接受本地绝对路径。
+
+### 卸载与切换安装方式
+
+```powershell
+& $dsh plugin --profile desktop remove dsh-prompt-library   # 沿用上面的 $dsh
+```
+
+`remove` 会清掉依赖项和 `dsh.profile.bundles` 里的那一项，**但会在 `node_modules/` 下留下一个悬空 junction**（已实测）。**卸载后必须再删一次**：
+
+```powershell
+Remove-Item "$env:USERPROFILE\.dsh\profiles\desktop\node_modules\dsh-prompt-library" -Force
+# 等价的更保险写法（只删链接本身，不碰目标目录）：
+# cmd /c rmdir "$env:USERPROFILE\.dsh\profiles\desktop\node_modules\dsh-prompt-library"
+```
+
+不删的后果是**下一次安装直接失败**，而且报错看不出真正原因：
+
+```
+ERR_PNPM_EPERM  [importPackage ...\node_modules\dsh-prompt-library] EPERM: operation not permitted,
+rename '...\node_modules\dsh-prompt-library_tmp_16068_1' -> '...\node_modules\dsh-prompt-library'
+```
+
+pnpm 先把包下到临时目录、再 `rename` 成正式目录；Windows 上目标位置被这个悬空 junction 占着，rename 失败，pnpm 回滚并把临时目录挪进 `node_modules\.ignored\`。GUI 只会显示一个权限类错误，包永远装不上。所以**换安装方式前先看一眼有没有残留**：
+
+```powershell
+cmd /c dir /AL "$env:USERPROFILE\.dsh\profiles\desktop\node_modules" | findstr /i dsh-prompt-library
+```
+
+有输出就按上面的命令删掉，再装。
+
+### 升级
+
+- **GitHub 版**：重装（卸载 + 再装，或 GUI 里的更新）。
+- **link 版**：替换 `lib/` 下的文件即可，**无依赖、无构建**。
+- 两种方式都一样：宿主对**已经加载过**的插件模块没有热重载，改完必须**重启 DSH**（改 mtime、disable→enable 都无效）。
 
 > 首次**新增**这个 bundle 时**不需要**重启：loader 会直接接管（实测 `fiberPhase: "active"`，四个座位当场注册）。热重载的缺口只针对「已加载过、又被改了内容」的模块。
 
